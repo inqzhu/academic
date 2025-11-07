@@ -14,6 +14,31 @@
   <script src="localjquery.js"></script>
   <script src="localjsbootstrap.js"></script>
   <link href='localg.css' rel='stylesheet' type='text/css'>
+  <style>
+  /* ---- 重置 ---- */
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  /* ---- 可滚动的页面 ---- */
+  html, body { height: 100%; }
+  body {
+      background: #fff;
+      color: #000;
+      /* 关键：允许滚动 */
+      overflow-y: auto;
+      overflow-x: hidden;
+  }
+
+  /* ---- 背景画布：绝对定位，随内容滚动 ---- */
+  #poly-canvas {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: scrollHeight;
+      z-index: -1; /* 置于内容下方 */
+  }
+
+  </style>
 </head>
 <body>
 
@@ -57,7 +82,7 @@
 I am currently a lecturer at <a href="http://tongji.uibe.edu.cn/index.htm">School of Statistics, University of International Business and Economics</a>.
 I got my Ph.D. degree in Statistics from <a href="http://stat.ruc.edu.cn/">School of Statistics, Renmin University of China</a> in 2022. My research interests include data mining, deep learning, social network analysis and high-frequency financial data analysis.</p>
 
- <h2 >Educations</h2>
+ <h1 >Educations</h1>
 <ul>
   <li>2022, Ph.D., Statistics, School of Statistics, Renmin University of China</li>
   <li>2018, Master, Computer application technology, School of Computer Science and Technology, University of Chinese Academy of Sciences</li>
@@ -93,7 +118,7 @@ I got my Ph.D. degree in Statistics from <a href="http://stat.ruc.edu.cn/">Schoo
             
             <!-- Publications -->
             <div class="col-md-8" style="height: 100vh;">    
-                <h2 id="publications">Publications</h2>
+                <h1 id="publications">Publications</h1>
                 
 
 
@@ -226,7 +251,77 @@ I got my Ph.D. degree in Statistics from <a href="http://stat.ruc.edu.cn/">Schoo
     
     <!-- Other people may like it too! -->
     <a style="color:#b5bec9;font-size:0.8em; float:right;" href="https://github.com/mavroudisv/plain-academic">Plain Academic</a> 
-    
+<!-- Canvas 背景 -->
+    <canvas id="poly-canvas"></canvas>
+
+   
+
+    <script>
+/* ========== 黑白多边形背景 ========== */
+const canvas = document.getElementById('poly-canvas');
+const ctx    = canvas.getContext('2d');
+
+function resize() {
+    canvas.width  = window.innerWidth;
+    canvas.height = document.documentElement.scrollHeight; // 整个可滚动高度
+}
+window.addEventListener('resize', resize);
+resize();
+
+class Poly {
+    constructor() {
+        this.x = Math.random() * canvas.width;
+        this.y = Math.random() * canvas.height;
+        this.size = Math.random() * 70 + 20;
+        this.rot  = 0;
+        this.rotSp= (Math.random() - .5) * 0.02;
+        this.vx   = (Math.random() - .5) * 0.4;
+        this.vy   = (Math.random() - .5) * 0.4;
+        this.sides= Math.floor(Math.random() * 4) + 3;
+        this.opacity = Math.random() * 0.4 + 0.1;
+    }
+    update() {
+        this.x += this.vx;
+        this.y += this.vy;
+        this.rot += this.rotSp;
+        // 水平边界循环
+        if (this.x < -this.size) this.x = canvas.width  + this.size;
+        if (this.x > canvas.width  + this.size) this.x = -this.size;
+        // 垂直边界循环（支持长页面）
+        if (this.y < -this.size) this.y = canvas.height + this.size;
+        if (this.y > canvas.height + this.size) this.y = -this.size;
+    }
+    draw() {
+        ctx.save();
+        ctx.translate(this.x, this.y);
+        ctx.rotate(this.rot);
+        ctx.strokeStyle = `rgba(0,0,0,${this.opacity})`;
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        for (let i = 0; i < this.sides; i++) {
+            const a = (i / this.sides) * Math.PI * 2;
+            const x = Math.cos(a) * this.size;
+            const y = Math.sin(a) * this.size;
+            i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+        }
+        ctx.closePath(); ctx.stroke();
+        ctx.restore();
+    }
+}
+
+const polys = Array.from({length: 77}, () => new Poly());
+
+function loop() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    polys.forEach(p => { p.update(); p.draw(); });
+    requestAnimationFrame(loop);
+}
+loop();
+
+/* 鼠标轻微影响 */
+let mx = canvas.width / 2, my = canvas.height / 2;
+addEventListener('mousemove', e => { mx = e.clientX; my = e.clientY + window.scrollY; });
+</script>
 </body>
 
 </html>
