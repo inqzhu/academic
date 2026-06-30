@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<!--
+    Plain-Academic by Vasilios Mavroudis
+    Released under the Simplified BSD License/FreeBSD (2-clause) License.
+    https://github.com/mavroudisv/plain-academic
+-->
+
+<html lang="en">
+<head>
+  <title>Yingqiu Zhu</title>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <link rel="stylesheet" href="localbootstrap.css">
+  <script src="localjquery.js"></script>
+  <script src="localjsbootstrap.js"></script>
+  <link href='localg.css' rel='stylesheet' type='text/css'>
+  <style>
+  /* ---- 重置 ---- */
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  /* ---- 可滚动的页面 ---- */
+  html, body { height: 100%; }
+  body {
+      background: #fff;
+      color: #000;
+      overflow-y: auto;
+      overflow-x: hidden;
+  }
+
+  /* ---- 背景画布：绝对定位，随内容滚动 ---- */
+  #poly-canvas {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: scrollHeight;
+      z-index: -1;
+  }
+  </style>
+</head>
+<body>
+
+
+<!-- Navigation -->
+    <nav class="navbar navbar-default navbar-static-top" role="navigation">
+      <div class="container">
+        <div class="navbar-header">
+          <button type="button" class="navbar-toggle collapsed" data-toggle="collapse" data-target="#bs-example-navbar-collapse-1">
+                        <span class="sr-only">Toggle navigation</span>
+                        <span class="icon-bar"></span>
+                        <span class="icon-bar"></span>
+                        <span class="icon-bar"></span>
+                    </button>
+        </div>
+
+        <!-- Collect the nav links, forms, and other content for toggling -->
+        <div class="collapse navbar-collapse" id="bs-example-navbar-collapse-1">
+          <ul class="nav navbar-nav">
+                  <li><a href="index.html">Home</a></li>
+                  <li><a href="index.html#publications">Publications</a></li> 
+                  <li><a href="photo.html">Photos</a></li>                   
+          </ul>
+        </div>
+      </div>
+    </nav>
+  
+  <!-- Page Content -->
+    <div class="container">
+
+        <div class="row">
+
+            <!-- Entries Column -->
+            <div class="col-md-8" style="height: 720px;">
+   
+                <h4> 2026-6 贸大毕业季，北京 Graduation of UIBE, Beijing</h4>
+                <img class="img-thumbnail img-responsive" src="photo-26-2.jpg" alt=""><br>
+                <br/>
+
+                <h4> 2026-5 组会，北京 Seminar in UIBE, Beijing</h4>
+                <img class="img-thumbnail img-responsive" src="photo-26-1.jpg" alt=""><br>
+                <br/>
+
+                <h4> 2025-7 参加2025联合会议，杭州 Talk on JCSDS, Hangzhou</h4>
+                <img class="img-thumbnail img-responsive" src="photo-25-2.jpg" alt=""><br>
+                <br/>
+      
+                <h4> 2025-6 贸大毕业季，北京 Graduation of UIBE, Beijing</h4>
+                <img class="img-thumbnail img-responsive" src="photo-25-1.jpg" alt=""><br>
+
+                <h4> 2024-7 参加2024联合会议，昆明 Talk on JCSDS, Kunming</h4>
+                <img class="img-thumbnail img-responsive" src="photo-24-2.jpg" alt=""><br>
+                <br/>
+      
+                <h4> 2024-6 参加IMS会议，墨尔本 Talk on IMS, Melbourne</h4>
+                <img class="img-thumbnail img-responsive" src="photo-24-1.jpg" alt=""><br>
+    
+                
+                <br/>
+
+            
+        </div>
+
+
+    </div>
+    <!-- /.container -->
+    
+    <!-- Other people may like it too! -->
+    <a style="color:#b5bec9;font-size:0.8em; float:right;" href="https://github.com/mavroudisv/plain-academic">Plain Academic</a> 
+<!-- Canvas 背景 -->
+    <canvas id="poly-canvas"></canvas>
+
+   
+
+    <script>
+/* ========== 彩色多边形背景（蓝色/红色随机） ========== */
+const canvas = document.getElementById('poly-canvas');
+const ctx    = canvas.getContext('2d');
+
+function resize() {
+    canvas.width  = window.innerWidth;
+    canvas.height = document.documentElement.scrollHeight; // 整个可滚动高度
+}
+window.addEventListener('resize', resize);
+resize();
+
+class Poly {
+    constructor() {
+        this.x = Math.random() * canvas.width;
+        this.y = Math.random() * canvas.height;
+        this.size = Math.random() * 70 + 20;
+        this.rot  = 0;
+        this.rotSp= (Math.random() - .5) * 0.02;
+        this.vx   = (Math.random() - .5) * 0.4;
+        this.vy   = (Math.random() - .5) * 0.4;
+        this.sides= Math.floor(Math.random() * 4) + 3;
+        this.opacity = Math.random() * 0.2 + 0.1;
+        // 随机选择红色或蓝色
+        this.color = Math.random() > 0.5 ? 'red' : 'blue';
+    }
+    update() {
+        this.x += this.vx;
+        this.y += this.vy;
+        this.rot += this.rotSp;
+        // 水平边界循环
+        if (this.x < -this.size) this.x = canvas.width  + this.size;
+        if (this.x > canvas.width  + this.size) this.x = -this.size;
+        // 垂直边界循环（支持长页面）
+        if (this.y < -this.size) this.y = canvas.height + this.size;
+        if (this.y > canvas.height + this.size) this.y = -this.size;
+    }
+    draw() {
+        ctx.save();
+        ctx.translate(this.x, this.y);
+        ctx.rotate(this.rot);
+        // 根据颜色设置不同的 RGBA
+        let r, g, b;
+        if (this.color === 'red') {
+            r = 255; g = 0;   b = 0;
+        } else { // blue
+            r = 0;   g = 0;   b = 255;
+        }
+        ctx.strokeStyle = `rgba(${r},${g},${b},${this.opacity})`;
+        ctx.lineWidth = 1.5;
+        ctx.beginPath();
+        for (let i = 0; i < this.sides; i++) {
+            const a = (i / this.sides) * Math.PI * 2;
+            const x = Math.cos(a) * this.size;
+            const y = Math.sin(a) * this.size;
+            i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+        }
+        ctx.closePath(); ctx.stroke();
+        ctx.restore();
+    }
+}
+
+const polys = Array.from({length: 77}, () => new Poly());
+
+function loop() {
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    polys.forEach(p => { p.update(); p.draw(); });
+    requestAnimationFrame(loop);
+}
+loop();
+
+/* 鼠标轻微影响 */
+let mx = canvas.width / 2, my = canvas.height / 2;
+addEventListener('mousemove', e => { mx = e.clientX; my = e.clientY + window.scrollY; });
+</script>
+</body>
+</html>
