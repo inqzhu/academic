@@ -3,192 +3,477 @@
     Plain-Academic by Vasilios Mavroudis
     Released under the Simplified BSD License/FreeBSD (2-clause) License.
     https://github.com/mavroudisv/plain-academic
+    图片异步懒加载改造 by Yingqiu Zhu
 -->
 
 <html lang="en">
 <head>
-  <title>Yingqiu Zhu</title>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <link rel="stylesheet" href="localbootstrap.css">
-  <script src="localjquery.js"></script>
-  <script src="localjsbootstrap.js"></script>
-  <link href='localg.css' rel='stylesheet' type='text/css'>
-  <style>
-  /* ---- 重置 ---- */
-  * { margin: 0; padding: 0; box-sizing: border-box; }
+    <title>Yingqiu Zhu</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" href="localbootstrap.css">
+    <script src="localjquery.js"></script>
+    <script src="localjsbootstrap.js"></script>
+    <link href='localg.css' rel='stylesheet' type='text/css'>
+    <style>
+        /* ---- 重置 ---- */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
 
-  /* ---- 可滚动的页面 ---- */
-  html, body { height: 100%; }
-  body {
-      background: #fff;
-      color: #000;
-      overflow-y: auto;
-      overflow-x: hidden;
-  }
+        /* ---- 可滚动的页面 ---- */
+        html,
+        body {
+            height: 100%;
+        }
+        body {
+            background: #fff;
+            color: #000;
+            overflow-y: auto;
+            overflow-x: hidden;
+        }
 
-  /* ---- 背景画布：绝对定位，随内容滚动 ---- */
-  #poly-canvas {
-      position: absolute;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: scrollHeight;
-      z-index: -1;
-  }
-  </style>
+        /* ---- 背景画布：绝对定位，随内容滚动 ---- */
+        #poly-canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: scrollHeight;
+            z-index: -1;
+        }
+
+        /* ========== 图片异步加载样式 ========== */
+        .lazy-image-wrapper {
+            position: relative;
+            display: block;
+            width: 100%;
+            background: #f5f5f5;
+            border-radius: 4px;
+            overflow: hidden;
+            /* 保持宽高比，避免布局抖动 —— 用 padding-bottom 撑开 */
+        }
+
+        .lazy-image-wrapper img {
+            display: block;
+            width: 100%;
+            height: auto;
+            opacity: 0;
+            transition: opacity 0.6s ease;
+            /* 初始透明，加载完成后渐入 */
+        }
+
+        .lazy-image-wrapper img.loaded {
+            opacity: 1;
+        }
+
+        /* ---- 占位 loading 动画（纯CSS） ---- */
+        .lazy-image-wrapper .placeholder {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+            color: #aaa;
+            font-size: 14px;
+            pointer-events: none;
+            transition: opacity 0.4s ease;
+            background: #f0f0f0;
+        }
+        .lazy-image-wrapper .placeholder .spinner {
+            width: 32px;
+            height: 32px;
+            border: 3px solid #e0e0e0;
+            border-top-color: #5a8cbf;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            margin-bottom: 10px;
+        }
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        .lazy-image-wrapper .placeholder.hidden {
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        /* 图片加载失败时的样式 */
+        .lazy-image-wrapper img.error {
+            opacity: 1;
+            /* 显示破碎图片的默认样式 */;
+        }
+        .lazy-image-wrapper .placeholder.error-text {
+            color: #c0392b;
+        }
+
+        /* 保持缩略图边框样式与 Bootstrap 一致 */
+        .img-thumbnail {
+            padding: 4px;
+            background-color: #fff;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            transition: all .2s ease-in-out;
+            display: block;
+            max-width: 100%;
+            height: auto;
+        }
+
+        /* 让每个图片区块保持间距 */
+        .photo-entry {
+            margin-bottom: 30px;
+        }
+        .photo-entry h4 {
+            margin-bottom: 10px;
+        }
+    </style>
 </head>
 <body>
 
-
-<!-- Navigation -->
+    <!-- Navigation -->
     <nav class="navbar navbar-default navbar-static-top" role="navigation">
-      <div class="container">
-        <div class="navbar-header">
-          <button type="button" class="navbar-toggle collapsed" data-toggle="collapse" data-target="#bs-example-navbar-collapse-1">
-                        <span class="sr-only">Toggle navigation</span>
-                        <span class="icon-bar"></span>
-                        <span class="icon-bar"></span>
-                        <span class="icon-bar"></span>
-                    </button>
-        </div>
+        <div class="container">
+            <div class="navbar-header">
+                <button type="button" class="navbar-toggle collapsed" data-toggle="collapse" data-target="#bs-example-navbar-collapse-1">
+                    <span class="sr-only">Toggle navigation</span>
+                    <span class="icon-bar"></span>
+                    <span class="icon-bar"></span>
+                    <span class="icon-bar"></span>
+                </button>
+            </div>
 
-        <!-- Collect the nav links, forms, and other content for toggling -->
-        <div class="collapse navbar-collapse" id="bs-example-navbar-collapse-1">
-          <ul class="nav navbar-nav">
-                  <li><a href="index.html">Home</a></li>
-                  <li><a href="index.html#publications">Publications</a></li> 
-                  <li><a href="photo.html">Photos</a></li>                   
-          </ul>
+            <!-- Collect the nav links, forms, and other content for toggling -->
+            <div class="collapse navbar-collapse" id="bs-example-navbar-collapse-1">
+                <ul class="nav navbar-nav">
+                    <li><a href="index.html">Home</a></li>
+                    <li><a href="index.html#publications">Publications</a></li>
+                    <li><a href="photo.html">Photos</a></li>
+                </ul>
+            </div>
         </div>
-      </div>
     </nav>
-  
-  <!-- Page Content -->
+
+    <!-- Page Content -->
     <div class="container">
 
         <div class="row">
 
             <!-- Entries Column -->
             <div class="col-md-8" style="height: 720px;">
- 
-                <h4> 2026-7 参加2026联合会议，贵阳 Talk on JCSDS, Guiyang</h4>
-                <img class="img-thumbnail img-responsive" src="photo-26-3.jpg" alt=""><br>
-                <br/>
 
-                <h4> 2026-6 贸大毕业季，北京 Graduation of UIBE, Beijing</h4>
-                <img class="img-thumbnail img-responsive" src="photo-26-2.jpg" alt=""><br>
-                <br/>
+                <!-- ===== 图片条目：使用 data-src 存储真实地址，由 JS 异步加载 ===== -->
 
-                <h4> 2026-5 组会，北京 Seminar in UIBE, Beijing</h4>
-                <img class="img-thumbnail img-responsive" src="photo-26-1.jpg" alt=""><br>
-                <br/>
+                <div class="photo-entry">
+                    <h4>2026-7 参加2026联合会议，贵阳 Talk on JCSDS, Guiyang</h4>
+                    <div class="lazy-image-wrapper img-thumbnail img-responsive">
+                        <img class="lazy-image" data-src="photo-26-3.jpg" alt="2026-7 贵阳 JCSDS">
+                        <div class="placeholder">
+                            <div class="spinner"></div>
+                            <span>加载中...</span>
+                        </div>
+                    </div>
+                </div>
 
-                <h4> 2025-7 参加2025联合会议，杭州 Talk on JCSDS, Hangzhou</h4>
-                <img class="img-thumbnail img-responsive" src="photo-25-2.jpg" alt=""><br>
-                <br/>
-      
-                <h4> 2025-6 贸大毕业季，北京 Graduation of UIBE, Beijing</h4>
-                <img class="img-thumbnail img-responsive" src="photo-25-1.jpg" alt=""><br>
+                <div class="photo-entry">
+                    <h4>2026-6 贸大毕业季，北京 Graduation of UIBE, Beijing</h4>
+                    <div class="lazy-image-wrapper img-thumbnail img-responsive">
+                        <img class="lazy-image" data-src="photo-26-2.jpg" alt="2026-6 贸大毕业季">
+                        <div class="placeholder">
+                            <div class="spinner"></div>
+                            <span>加载中...</span>
+                        </div>
+                    </div>
+                </div>
 
-                <h4> 2024-7 参加2024联合会议，昆明 Talk on JCSDS, Kunming</h4>
-                <img class="img-thumbnail img-responsive" src="photo-24-2.jpg" alt=""><br>
-                <br/>
-      
-                <h4> 2024-1 参加IMS会议，墨尔本 Talk on IMS, Melbourne</h4>
-                <img class="img-thumbnail img-responsive" src="photo-24-1.jpg" alt=""><br>
-    
-                
-                <br/>
+                <div class="photo-entry">
+                    <h4>2026-5 组会，北京 Seminar in UIBE, Beijing</h4>
+                    <div class="lazy-image-wrapper img-thumbnail img-responsive">
+                        <img class="lazy-image" data-src="photo-26-1.jpg" alt="2026-5 组会">
+                        <div class="placeholder">
+                            <div class="spinner"></div>
+                            <span>加载中...</span>
+                        </div>
+                    </div>
+                </div>
 
-            
+                <div class="photo-entry">
+                    <h4>2025-7 参加2025联合会议，杭州 Talk on JCSDS, Hangzhou</h4>
+                    <div class="lazy-image-wrapper img-thumbnail img-responsive">
+                        <img class="lazy-image" data-src="photo-25-2.jpg" alt="2025-7 杭州 JCSDS">
+                        <div class="placeholder">
+                            <div class="spinner"></div>
+                            <span>加载中...</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="photo-entry">
+                    <h4>2025-6 贸大毕业季，北京 Graduation of UIBE, Beijing</h4>
+                    <div class="lazy-image-wrapper img-thumbnail img-responsive">
+                        <img class="lazy-image" data-src="photo-25-1.jpg" alt="2025-6 贸大毕业季">
+                        <div class="placeholder">
+                            <div class="spinner"></div>
+                            <span>加载中...</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="photo-entry">
+                    <h4>2024-7 参加2024联合会议，昆明 Talk on JCSDS, Kunming</h4>
+                    <div class="lazy-image-wrapper img-thumbnail img-responsive">
+                        <img class="lazy-image" data-src="photo-24-2.jpg" alt="2024-7 昆明 JCSDS">
+                        <div class="placeholder">
+                            <div class="spinner"></div>
+                            <span>加载中...</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="photo-entry">
+                    <h4>2024-1 参加IMS会议，墨尔本 Talk on IMS, Melbourne</h4>
+                    <div class="lazy-image-wrapper img-thumbnail img-responsive">
+                        <img class="lazy-image" data-src="photo-24-1.jpg" alt="2024-1 墨尔本 IMS">
+                        <div class="placeholder">
+                            <div class="spinner"></div>
+                            <span>加载中...</span>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+
         </div>
-
 
     </div>
     <!-- /.container -->
-    
+
     <!-- Other people may like it too! -->
-    <a style="color:#b5bec9;font-size:0.8em; float:right;" href="https://github.com/mavroudisv/plain-academic">Plain Academic</a> 
-<!-- Canvas 背景 -->
+    <a style="color:#b5bec9;font-size:0.8em; float:right;" href="https://github.com/mavroudisv/plain-academic">Plain Academic</a>
+
+    <!-- Canvas 背景 -->
     <canvas id="poly-canvas"></canvas>
 
-   
-
     <script>
-/* ========== 彩色多边形背景（蓝色/红色随机） ========== */
-const canvas = document.getElementById('poly-canvas');
-const ctx    = canvas.getContext('2d');
+        /* ========== 彩色多边形背景（蓝色/红色随机） ========== */
+        const canvas = document.getElementById('poly-canvas');
+        const ctx = canvas.getContext('2d');
 
-function resize() {
-    canvas.width  = window.innerWidth;
-    canvas.height = document.documentElement.scrollHeight; // 整个可滚动高度
-}
-window.addEventListener('resize', resize);
-resize();
-
-class Poly {
-    constructor() {
-        this.x = Math.random() * canvas.width;
-        this.y = Math.random() * canvas.height;
-        this.size = Math.random() * 70 + 20;
-        this.rot  = 0;
-        this.rotSp= (Math.random() - .5) * 0.02;
-        this.vx   = (Math.random() - .5) * 0.4;
-        this.vy   = (Math.random() - .5) * 0.4;
-        this.sides= Math.floor(Math.random() * 4) + 3;
-        this.opacity = Math.random() * 0.2 + 0.1;
-        // 随机选择红色或蓝色
-        this.color = Math.random() > 0.5 ? 'red' : 'blue';
-    }
-    update() {
-        this.x += this.vx;
-        this.y += this.vy;
-        this.rot += this.rotSp;
-        // 水平边界循环
-        if (this.x < -this.size) this.x = canvas.width  + this.size;
-        if (this.x > canvas.width  + this.size) this.x = -this.size;
-        // 垂直边界循环（支持长页面）
-        if (this.y < -this.size) this.y = canvas.height + this.size;
-        if (this.y > canvas.height + this.size) this.y = -this.size;
-    }
-    draw() {
-        ctx.save();
-        ctx.translate(this.x, this.y);
-        ctx.rotate(this.rot);
-        // 根据颜色设置不同的 RGBA
-        let r, g, b;
-        if (this.color === 'red') {
-            r = 255; g = 0;   b = 0;
-        } else { // blue
-            r = 0;   g = 0;   b = 255;
+        function resize() {
+            canvas.width = window.innerWidth;
+            canvas.height = document.documentElement.scrollHeight; // 整个可滚动高度
         }
-        ctx.strokeStyle = `rgba(${r},${g},${b},${this.opacity})`;
-        ctx.lineWidth = 1.5;
-        ctx.beginPath();
-        for (let i = 0; i < this.sides; i++) {
-            const a = (i / this.sides) * Math.PI * 2;
-            const x = Math.cos(a) * this.size;
-            const y = Math.sin(a) * this.size;
-            i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+        window.addEventListener('resize', resize);
+        resize();
+
+        class Poly {
+            constructor() {
+                this.x = Math.random() * canvas.width;
+                this.y = Math.random() * canvas.height;
+                this.size = Math.random() * 70 + 20;
+                this.rot = 0;
+                this.rotSp = (Math.random() - .5) * 0.02;
+                this.vx = (Math.random() - .5) * 0.4;
+                this.vy = (Math.random() - .5) * 0.4;
+                this.sides = Math.floor(Math.random() * 4) + 3;
+                this.opacity = Math.random() * 0.2 + 0.1;
+                // 随机选择红色或蓝色
+                this.color = Math.random() > 0.5 ? 'red' : 'blue';
+            }
+            update() {
+                this.x += this.vx;
+                this.y += this.vy;
+                this.rot += this.rotSp;
+                // 水平边界循环
+                if (this.x < -this.size) this.x = canvas.width + this.size;
+                if (this.x > canvas.width + this.size) this.x = -this.size;
+                // 垂直边界循环（支持长页面）
+                if (this.y < -this.size) this.y = canvas.height + this.size;
+                if (this.y > canvas.height + this.size) this.y = -this.size;
+            }
+            draw() {
+                ctx.save();
+                ctx.translate(this.x, this.y);
+                ctx.rotate(this.rot);
+                // 根据颜色设置不同的 RGBA
+                let r, g, b;
+                if (this.color === 'red') {
+                    r = 255;
+                    g = 0;
+                    b = 0;
+                } else { // blue
+                    r = 0;
+                    g = 0;
+                    b = 255;
+                }
+                ctx.strokeStyle = `rgba(${r},${g},${b},${this.opacity})`;
+                ctx.lineWidth = 1.5;
+                ctx.beginPath();
+                for (let i = 0; i < this.sides; i++) {
+                    const a = (i / this.sides) * Math.PI * 2;
+                    const x = Math.cos(a) * this.size;
+                    const y = Math.sin(a) * this.size;
+                    i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+                }
+                ctx.closePath();
+                ctx.stroke();
+                ctx.restore();
+            }
         }
-        ctx.closePath(); ctx.stroke();
-        ctx.restore();
-    }
-}
 
-const polys = Array.from({length: 77}, () => new Poly());
+        const polys = Array.from({ length: 77 }, () => new Poly());
 
-function loop() {
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    polys.forEach(p => { p.update(); p.draw(); });
-    requestAnimationFrame(loop);
-}
-loop();
+        function loop() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            polys.forEach(p => { p.update();
+                p.draw(); });
+            requestAnimationFrame(loop);
+        }
+        loop();
 
-/* 鼠标轻微影响 */
-let mx = canvas.width / 2, my = canvas.height / 2;
-addEventListener('mousemove', e => { mx = e.clientX; my = e.clientY + window.scrollY; });
-</script>
+        /* 鼠标轻微影响 */
+        let mx = canvas.width / 2,
+            my = canvas.height / 2;
+        addEventListener('mousemove', e => { mx = e.clientX;
+            my = e.clientY + window.scrollY; });
+
+        /* ============================================================
+               ★★★ 图片异步懒加载（AJAX 风格） ★★★
+               - 使用 Intersection Observer 监测图片是否进入视口
+               - 进入视口后，通过 Image 对象异步加载（不阻塞主线程）
+               - 加载完成后替换 src，并隐藏占位动画
+               - 支持加载失败降级显示
+               ============================================================ */
+
+        document.addEventListener('DOMContentLoaded', function() {
+
+            // 选取所有需要懒加载的图片
+            const lazyImages = document.querySelectorAll('img.lazy-image');
+
+            if (lazyImages.length === 0) return;
+
+            // 加载单张图片
+            function loadImage(img) {
+                const src = img.getAttribute('data-src');
+                if (!src) return;
+
+                // 如果已经加载过，避免重复
+                if (img.dataset.loaded === 'true') return;
+                img.dataset.loaded = 'true';
+
+                // 找到外层的 wrapper 和 placeholder
+                const wrapper = img.closest('.lazy-image-wrapper');
+                const placeholder = wrapper ? wrapper.querySelector('.placeholder') : null;
+
+                // 使用 Image 对象异步加载（真正的 AJAX 式图片加载）
+                const imageLoader = new Image();
+
+                imageLoader.onload = function() {
+                    // 加载成功：设置 src，触发渐入
+                    img.src = src;
+                    img.classList.add('loaded');
+                    // 隐藏占位
+                    if (placeholder) {
+                        placeholder.classList.add('hidden');
+                    }
+                    // 可选：移除 data-src 节省内存
+                    img.removeAttribute('data-src');
+                };
+
+                imageLoader.onerror = function() {
+                    // 加载失败：显示占位错误信息
+                    if (placeholder) {
+                        placeholder.innerHTML = '<span style="color:#c0392b;">⚠️ 图片加载失败</span>';
+                        placeholder.classList.remove('hidden');
+                    }
+                    img.classList.add('error');
+                    // 仍然显示一个占位（不设置 src，保留占位）
+                    console.warn('图片加载失败:', src);
+                };
+
+                // 开始异步加载
+                imageLoader.src = src;
+            }
+
+            // 使用 Intersection Observer 实现懒加载（进入视口才加载）
+            if ('IntersectionObserver' in window) {
+                const observer = new IntersectionObserver((entries, obs) => {
+                    entries.forEach(entry => {
+                        if (entry.isIntersecting) {
+                            const img = entry.target;
+                            loadImage(img);
+                            obs.unobserve(img); // 加载后不再观察
+                        }
+                    });
+                }, {
+                    // 提前 200px 开始加载，提升体验
+                    rootMargin: '200px 0px',
+                    threshold: 0.01
+                });
+
+                lazyImages.forEach(img => observer.observe(img));
+            } else {
+                // 降级方案：不支持 IntersectionObserver 时，直接加载所有图片
+                lazyImages.forEach(img => loadImage(img));
+            }
+
+            // 【可选】当页面所有图片都加载完成后，可以触发一个自定义事件或执行回调
+            // 这里不做额外处理，保持简洁
+
+            // 额外优化：如果页面滚动过程中，某些图片已经可见但未被观察（安全兜底）
+            // 在 scroll 事件中检查未加载的图片是否可见（但 Observer 已经处理了，这里仅作保险）
+            let scrollCheckTimer = null;
+            window.addEventListener('scroll', function() {
+                if (scrollCheckTimer) return;
+                scrollCheckTimer = setTimeout(() => {
+                    lazyImages.forEach(img => {
+                        if (img.dataset.loaded === 'true') return;
+                        const rect = img.getBoundingClientRect();
+                        const winHeight = window.innerHeight;
+                        // 如果图片已经在视口内但未被加载（极少情况），手动触发
+                        if (rect.top < winHeight + 200 && rect.bottom > -200) {
+                            loadImage(img);
+                            // 注意：此时没有 unobserver，因为可能没有被 observer 观察到
+                            // 但 loadImage 内部有 loaded 标记，不会重复加载
+                        }
+                    });
+                    scrollCheckTimer = null;
+                }, 300);
+            });
+
+            // 页面完全加载后，再检查一次是否有遗漏（比如图片在页面加载前就在视口中）
+            window.addEventListener('load', function() {
+                lazyImages.forEach(img => {
+                    if (img.dataset.loaded === 'true') return;
+                    const rect = img.getBoundingClientRect();
+                    const winHeight = window.innerHeight;
+                    if (rect.top < winHeight + 200 && rect.bottom > -200) {
+                        loadImage(img);
+                    }
+                });
+            });
+
+            // 对外暴露一个手动刷新方法，方便调试
+            window.refreshLazyImages = function() {
+                lazyImages.forEach(img => {
+                    if (img.dataset.loaded === 'true') return;
+                    const rect = img.getBoundingClientRect();
+                    const winHeight = window.innerHeight;
+                    if (rect.top < winHeight + 200 && rect.bottom > -200) {
+                        loadImage(img);
+                    }
+                });
+            };
+
+        }); // end DOMContentLoaded
+    </script>
+
 </body>
 </html>

@@ -3,348 +3,516 @@
     Plain-Academic by Vasilios Mavroudis
     Released under the Simplified BSD License/FreeBSD (2-clause) License.
     https://github.com/mavroudisv/plain-academic
+    图片异步懒加载改造 by Yingqiu Zhu
 -->
 
 <html lang="en">
 <head>
-  <title>Yingqiu Zhu</title>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <link rel="stylesheet" href="localbootstrap.css">
-  <script src="localjquery.js"></script>
-  <script src="localjsbootstrap.js"></script>
-  <link href='localg.css' rel='stylesheet' type='text/css'>
-  <style>
-  /* ---- 重置 ---- */
-  * { margin: 0; padding: 0; box-sizing: border-box; }
+    <title>Yingqiu Zhu</title>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" href="localbootstrap.css">
+    <script src="localjquery.js"></script>
+    <script src="localjsbootstrap.js"></script>
+    <link href='localg.css' rel='stylesheet' type='text/css'>
+    <style>
+        /* ---- 重置 ---- */
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
 
-  /* ---- 可滚动的页面 ---- */
-  html, body { height: 100%; }
-  body {
-      background: #fff;
-      color: #000;
-      /* 关键：允许滚动 */
-      overflow-y: auto;
-      overflow-x: hidden;
-  }
+        /* ---- 可滚动的页面 ---- */
+        html,
+        body {
+            height: 100%;
+        }
+        body {
+            background: #fff;
+            color: #000;
+            overflow-y: auto;
+            overflow-x: hidden;
+        }
 
-  /* ---- 背景画布：绝对定位，随内容滚动 ---- */
-  #poly-canvas {
-      position: absolute;
-      top: 0;
-      left: 0;
-      width: 100%;
-      height: scrollHeight;
-      z-index: -1; /* 置于内容下方 */
-  }
+        /* ---- 背景画布：绝对定位，随内容滚动 ---- */
+        #poly-canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: scrollHeight;
+            z-index: -1;
+        }
 
-  </style>
+        /* ========== 图片异步加载样式 ========== */
+        .lazy-image-wrapper {
+            position: relative;
+            display: block;
+            width: 100%;
+            background: #f5f5f5;
+            border-radius: 4px;
+            overflow: hidden;
+            /* 保持宽高比，避免布局抖动 —— 用 padding-bottom 撑开，但这里图片本身有宽高 */
+        }
+
+        .lazy-image-wrapper img {
+            display: block;
+            width: 100%;
+            height: auto;
+            opacity: 0;
+            transition: opacity 0.6s ease;
+        }
+
+        .lazy-image-wrapper img.loaded {
+            opacity: 1;
+        }
+
+        /* ---- 占位 loading 动画 ---- */
+        .lazy-image-wrapper .placeholder {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+            color: #aaa;
+            font-size: 14px;
+            pointer-events: none;
+            transition: opacity 0.4s ease;
+            background: #f0f0f0;
+        }
+        .lazy-image-wrapper .placeholder .spinner {
+            width: 32px;
+            height: 32px;
+            border: 3px solid #e0e0e0;
+            border-top-color: #5a8cbf;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            margin-bottom: 10px;
+        }
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        .lazy-image-wrapper .placeholder.hidden {
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        .lazy-image-wrapper img.error {
+            opacity: 1;
+        }
+        .lazy-image-wrapper .placeholder.error-text {
+            color: #c0392b;
+        }
+
+        /* 保持原有缩略图样式 */
+        .img-thumbnail {
+            padding: 4px;
+            background-color: #fff;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            transition: all .2s ease-in-out;
+            display: block;
+            max-width: 100%;
+            height: auto;
+        }
+
+        /* 针对头像的特殊处理：圆形 + 固定宽度 */
+        .avatar-wrapper {
+            display: inline-block;
+            width: 200px;
+            border-radius: 50%;
+            overflow: hidden;
+            background: #f0f0f0;
+        }
+        .avatar-wrapper img {
+            width: 100%;
+            height: auto;
+            display: block;
+            opacity: 0;
+            transition: opacity 0.6s ease;
+        }
+        .avatar-wrapper img.loaded {
+            opacity: 1;
+        }
+        .avatar-wrapper .placeholder {
+            border-radius: 50%;
+        }
+        /* 去掉原 img 的边框，因为 wrapper 已经模拟 */
+        .avatar-wrapper .img-thumbnail {
+            border: none;
+            padding: 0;
+            background: transparent;
+        }
+        /* 但保留 img-circle 样式，我们直接给 img 加 class */
+        .img-circle {
+            border-radius: 50%;
+        }
+
+        /* 主图片 wrapper 保持响应式 */
+        .main-image-wrapper {
+            width: 100%;
+        }
+    </style>
 </head>
 <body>
 
+    <!-- Navigation -->
+    <nav class="navbar navbar-default navbar-static-top" role="navigation">
+        <div class="container">
+            <div class="navbar-header">
+                <button type="button" class="navbar-toggle collapsed" data-toggle="collapse" data-target="#bs-example-navbar-collapse-1">
+                    <span class="sr-only">Toggle navigation</span>
+                    <span class="icon-bar"></span>
+                    <span class="icon-bar"></span>
+                    <span class="icon-bar"></span>
+                </button>
+            </div>
 
-<!-- Navigation -->
-	<nav class="navbar navbar-default navbar-static-top" role="navigation">
-	  <div class="container">
-		<div class="navbar-header">
-		  <button type="button" class="navbar-toggle collapsed" data-toggle="collapse" data-target="#bs-example-navbar-collapse-1">
-						<span class="sr-only">Toggle navigation</span>
-						<span class="icon-bar"></span>
-						<span class="icon-bar"></span>
-						<span class="icon-bar"></span>
-					</button>
-		</div>
+            <!-- Collect the nav links, forms, and other content for toggling -->
+            <div class="collapse navbar-collapse" id="bs-example-navbar-collapse-1">
+                <ul class="nav navbar-nav">
+                    <li><a href="index.html">Home</a></li>
+                    <li><a href="#publications">Publications</a></li>
+                    <li><a href="photo.html">Photos</a></li>
+                </ul>
+            </div>
+        </div>
+    </nav>
 
-		<!-- Collect the nav links, forms, and other content for toggling -->
-		<div class="collapse navbar-collapse" id="bs-example-navbar-collapse-1">
-		  <ul class="nav navbar-nav">
-				  <li><a href="index.html">Home</a></li>
-				  <li><a href="#publications">Publications</a></li> 
-                  <li><a href="photo.html">Photos</a></li> 
-		  </ul>
-		</div>
-	  </div>
-	</nav>
-  
-  <!-- Page Content -->
+    <!-- Page Content -->
     <div class="container">
 
         <div class="row">
 
             <!-- Entries Column -->
             <div class="col-md-8" style="height: 720px;">
-                
-                <!-- Main Image -->
-                <!--<h2 >About Me</h2>-->
-                <img class="img-thumbnail img-responsive" src="myphoto2.jpg" alt=""><br>
-                
-                <div style="margin-top:3%; text-align:justify;">                
-					<p>
-I am currently an associate professor at <a href="http://tongji.uibe.edu.cn/index.htm">School of Statistics, University of International Business and Economics</a>.
-I got my Ph.D. degree in Statistics from <a href="http://stat.ruc.edu.cn/">School of Statistics, Renmin University of China</a> in 2022. My research interests include data mining, deep learning, social network analysis and high-frequency financial data analysis.</p>
 
- <h1 >Educations</h1>
-<ul>
-  <li>2022, Ph.D., Statistics, School of Statistics, Renmin University of China</li>
-  <li>2018, Master, Computer application technology, School of Computer Science and Technology, University of Chinese Academy of Sciences</li>
-  <li>2015, Bachelor, Information management and information systems, School of Information, Renmin University of China</li>
-</ul>
-
+                <!-- Main Image (懒加载) -->
+                <div class="lazy-image-wrapper main-image-wrapper img-thumbnail img-responsive">
+                    <img class="lazy-image" data-src="myphoto2.jpg" alt="About Me photo">
+                    <div class="placeholder">
+                        <div class="spinner"></div>
+                        <span>加载中...</span>
+                    </div>
                 </div>
-            </div> 
+
+                <div style="margin-top:3%; text-align:justify;">
+                    <p>
+                        I am currently an associate professor at <a href="http://tongji.uibe.edu.cn/index.htm">School of Statistics, University of International Business and Economics</a>.
+                        I got my Ph.D. degree in Statistics from <a href="http://stat.ruc.edu.cn/">School of Statistics, Renmin University of China</a> in 2022. My research interests include data mining, deep learning, social network analysis and high-frequency financial data analysis.
+                    </p>
+
+                    <h1>Educations</h1>
+                    <ul>
+                        <li>2022, Ph.D., Statistics, School of Statistics, Renmin University of China</li>
+                        <li>2018, Master, Computer application technology, School of Computer Science and Technology, University of Chinese Academy of Sciences</li>
+                        <li>2015, Bachelor, Information management and information systems, School of Information, Renmin University of China</li>
+                    </ul>
+                </div>
+            </div>
 
             <!-- Contact Info on the Sidebar -->
             <div class="col-md-4">
-              <img src="myphoto.jpg" class="img-circle img-thumbnail" width="200px" alt="">
+                <!-- 头像 (懒加载) -->
+                <div class="lazy-image-wrapper avatar-wrapper img-thumbnail" style="display:inline-block; width:200px; border-radius:50%; overflow:hidden; padding:0; border:none;">
+                    <img class="lazy-image img-circle" data-src="myphoto.jpg" alt="Yingqiu Zhu" style="width:100%; height:auto; display:block;">
+                    <div class="placeholder" style="border-radius:50%;">
+                        <div class="spinner"></div>
+                        <span>加载中...</span>
+                    </div>
+                </div>
 
                 <div style="font-family: 'Oswald', sans-serif; font-size: 32px;"><b>朱映秋 Yingqiu Zhu</b></div><br>
 
                 <p>Associate Professor<br>
-                  School of Statistics<br>
-                University of International Business and Economics<br>
-                Huixin Dong Street No.10<br>
-                Beijing <br>
-                China<br>
+                    School of Statistics<br>
+                    University of International Business and Economics<br>
+                    Huixin Dong Street No.10<br>
+                    Beijing <br>
+                    China<br>
                 </p>
             </div>
-            
-            
+
             <!-- Links on the Sidebar -->
             <div class="col-md-4" style="margin-top:2%">
-              <dd>>> <a href="https://scholar.google.com/citations?user=Z6v7O7wAAAAJ">Google Scholar</a></dd> 
-              <dd>>> <a >inqzhu@uibe.edu.cn</a></dd>
-              <dd>>> <a href="http://tongji.uibe.edu.cn/szdw/jsjs/sljrx/84bc55468a644aaf959e2bf996a63471.htm">Home page at UIBE</a></dd>
+                <dd>>> <a href="https://scholar.google.com/citations?user=Z6v7O7wAAAAJ">Google Scholar</a></dd>
+                <dd>>> <a>inqzhu@uibe.edu.cn</a></dd>
+                <dd>>> <a href="http://tongji.uibe.edu.cn/szdw/jsjs/sljrx/84bc55468a644aaf959e2bf996a63471.htm">Home page at UIBE</a></dd>
             </div>
-            
-            
+
             <!-- Publications -->
-            <div class="col-md-8" style="height: 100vh;">    
+            <div class="col-md-8" style="height: 100vh;">
                 <h1 id="publications">Publications</h1>
-                
 
-<strong>2026</strong><br/>
-<ol>
-
-
-<li class="paper"><b>Zhu, Y.</b>, Huang, D. (2026). A Communication Efficient Boosting Method for Distributed Spectral Clustering. <i>Pattern Recognition</i>, 176, 113168.</li>  
-
-<li class="paper"><b>Zhu, Y.</b>, Bao, Y., Qin, L., Sun, Q., Shia, B., Chen, M. (2026). Resilience Analysis based on Multi-Layer Network Community Detection of Supply Chain Network. <i>Annals of Operations Research</i>, 361, 1447–1471. </li>  
-
-
-<li class="paper">Qin, L., Zhang, X., <b>Zhu, Y.*</b>, Chen, Y., Shia, B. (2026). Bilateral Matrix Spatiotemporal Autoregressive Model. <i>Computational Statistics & Data Analysis</i>, 215, 108291.</li>  
-
-<li class="paper">Qin, L., Wang, Y., <b>Zhu, Y.</b>, Shia, B. (2026). A Universal Kriging Predictor for Probability Density Function based on Gaussian Mixture Model. <i>Journal of Forecasting</i>, 45(3), 1188-1202.</li>  
-
-<li class="paper">秦磊, 陈阳, <b>朱映秋*</b>, 谢邦昌 (2026). 矩阵值时间序列的时空自回归模型及其应用. <i>统计研究</i>, 2026, 43(04): 146-160.</li>
-
-<li class="paper"><b>Zhu, Y.</b>, Li, J., Qin, L., Yang, J., Chen, M. (2026). SGCN: A Robust Subsampling-Based GCN for Large-Scale Network with Out-of-Distribution Nodes. <i>Annals of Operations Research</i>. https://doi.org/10.1007/s10479-026-07269-9</li>  
-
-<li class="paper">Wang, Y., <b>Zhu, Y.</b>, Shia, B., Chen, M., Qin, L. (2026). Density Prediction of Income Distribution based on Mixed Frequency Data. <i>Applied Economics</i>. https://doi.org/10.1080/00036846.2026.2649920</li>  
-</ol>
-
-
-<strong>2025</strong><br/>
-<ol>
-
-<li class="paper"><b>Zhu, Y.</b>, Huang, D., Zhang, B. (2025). A Wasserstein Distance-Based Spectral Clustering Method for Transaction Data Analysis. <i>Expert Systems With Applications</i>, 260, 125418.</li>  
-
-<li class="paper">Qin, L., Wang, Y.*, <b>Zhu, Y.*</b>, Shia, B. (2025). Bayesian Dynamic Matrix Factor Models. <i>Journal of Business & Economic Statistics</i>, 43(4), 1170–1182. </li>  
-
-<li class="paper"><b>Zhu, Y.</b>, Wang, Y., Qin, L., Zhang, B., Shia, B., Chen, M. (2025). Naïve Bayes Classifier based on Reliability Measurement for Datasets with Noisy Labels. <i>Annals of Operations Research</i>, 349, 259-286.</li>  
-
-<li class="paper">Qin, L., <b>Zhu, Y.*</b>, Liu, S., Zhang, X., Zhao, Y. (2025). The Shapley Value in Data Science: Advances in Computation, Extensions, and Applications. <i>Mathematics</i>, 13(10), 1581.</li>  
-
-<li class="paper">Xu, K., <b>Zhu, Y.*</b>, Liu, Y., Wang, H. (2025). CluBear: A Subsampling Package for Interactive Statistical Analysis with Massive Data on a Single Machine. <i>Communications in Statistics-Simulation and Computation</i>. 54(6), 1966–1986.</li>  
-
-<li class="paper">Xiao, Y., <b>Zhu, Y.*</b>, Huang, D. (2025). Adaptive Subsampling Spectral Clustering based on Second-Order Neighbour Relationships for Sparse Networks. <i>Stat</i>, 14(4), e70098.</li>  
-
-
-
-<li class="paper">Wang, W., Qin, L., Wang, Y., Ye, L., Wang, R., <b>Zhu, Y.*</b> (2025). Frequent Use of Online Medical Records: Analysis of Influence Factors based on Structural Equation Modeling. <i>Frontiers in Public Health</i>, 13, 1609503.</li>  
-
-
-
-
-<li class="paper">Yin, H., Wang, L., <b>Zhu, Y.</b>, Zhu, L., & Huang, D. (2025). Vertical Federated Feature Screening. In The Thirty-ninth Annual Conference on Neural Information Processing Systems (NeurIPS). </li>
-
-<li class="paper"><b>朱映秋</b>, 郑畅, 张波 (2025). 金融时间序列的自适应贝叶斯在线变点检测. <i>统计研究</i>, 42(01), 145-160.</li>
-
-<li class="paper">秦磊, 王寅智, <b>朱映秋</b>, 谢邦昌 (2025). 已知组结构下混频时间序列的潜在因子分析. <i>系统工程理论与实践,</i> 45(3): 1014-1028.</li>
-
-</ol>
-
-<strong>2024</strong><br/>
-<ol>
-
-<li class="paper"><b>Zhu, Y.</b>, Wang, R., Feng, M., Qin, L., Shia, B., Chen, M. (2024). Supply Chain Analysis based on Community Detection of Multi-Layer Weighted Networks. <i>Mathematics</i>, 12(22), 3606.</li>  
-            
-<li class="paper">Zeng, Q., <b>Zhu, Y.*</b>, Zhu, X., Wang, F., Zhao, W., Sun, S., Su, M., Wang, H. (2024). Improved Naive Bayes with Mislabeled Data. <i>Statistics and Its Interface</i>, 17(3), 323-336.</li>
-
-<li class="paper">Wang, Y., <b>Zhu, Y.</b>, Sun, Q., Qin, L. (2024). Adaptively Robust High-Dimensional Matrix Factor Analysis under Huber Loss Function. <i>Journal of Statistical Planning and Inference</i>. 231, 106137.</li>
-  
-<li class="paper">Deng, J., Huang, D., Ding, Y., <b>Zhu, Y.</b>, Jing, B., Zhang, B. (2024). Subsampling Spectral Clustering for Stochastic Block Models in Large-Scale Networks. <i>Computational Statistics & Data Analysis</i>, 189, 107835.</li>
-
-<li class="paper"><b>朱映秋</b>, 黄丹阳, 张波 (2024). 基于高斯混合模型的分布因子聚类方法. <i>统计研究</i>, 41(06), 147-160.</li>
-
-<li class="paper">陈阳, 张晓梅, <b>朱映秋</b>, 秦磊 (2024). 矩阵值时间序列自回归模型的稳健估计. <i>应用数学学报</i>, 47(6): 999-1026.</li>
-
-</ol>
-
-<strong>2023</strong><br/>
-<ol>
-
-<li class="paper">Pan, R., <b>Zhu, Y.*</b>, Guo, B., Zhu, X., Wang, H. (2023). A Sequential Addressing Subsampling Method for Massive Data Analysis under Memory Constraint. <i>IEEE Transactions on Knowledge and Data Engineering</i>, 35(9), 9502-9513.</li>
-
-<li class="paper">黄丹阳, 罗伊琳, <b>朱映秋*</b> (2023). 面向第三方支付平台非结构化大数据分布特征的融合聚类算法. <i>经济管理学刊</i>, 2(3), 179-208.</li>
-
-<li class="paper">黄丹阳,<b>朱映秋</b>,南金伶,王汉生 (2023).基于交易流水的信用卡套现交易及商户识别. <i>数理统计与管理</i>, 42(01), 127-144.</li>
-
-</ol>
-
-<strong>2021</strong><br/>
-<ol>
-
-<li class="paper"><b>Zhu, Y.</b>, Deng, Q., Huang, D., Jing, B., Zhang, B. (2021). Clustering Based on Kolmogorov–Smirnov Statistic with Application to Bank Card Transaction Data. <i>Journal of the Royal Statistical Society: Series C (Applied Statistics)</i>, 70(3), 558-578.</li>
-
-<li class="paper"><b>Zhu, Y.</b>, Huang, D., Gao, Y., Wu, R., Chen, Y., Zhang, B., Wang, H. (2021). Automatic, Dynamic, and Nearly Optimal Learning Rate Specification via Local Quadratic Approximation. <i>Neural Networks</i>, 141, 11-29.</li>
-
-<li class="paper">Wang, F., <b>Zhu, Y.</b>, Huang, D., Qi, H., Wang, H. (2021). Distributed One-Step Upgraded Estimation for Non-Uniformly and Nonrandomly Distributed Data. <i>Computational Statistics & Data Analysis</i>, 162, 107265.</li>
-
-<li class="paper"><b>朱映秋</b>, 张波 (2021). 基于已实现波动率的上证综指异常时序检测. <i>系统工程理论与实践</i>, 41(3), 625-635.</li>
-
-<li class="paper">黄丹阳, 毕博洋, <b>朱映秋</b> (2021). 基于高斯谱聚类的风险商户聚类分析. <i>统计研究</i>, 38(6), 145-160.</li>
-
-</ol>
-
-
-<strong>2020</strong><br/>
-<ol>
-
-<li class="paper"><b>Zhu, Y.</b>, Huang, D., Xu, W., Zhang, B. (2020). Link Prediction Combining Network Structure and Topic Distribution in Large-Scale Directed Network. <i>Journal of Organizational Computing and Electronic Commerce</i>, 30(2), 169-185.</li>
-
-</ol>
-
-
-<strong>2018</strong><br/>
-<ol>
-
-<li class="paper">Guo, D., <b>Zhu, Y.</b>, Yin, W. (2018). OSCAR: A Framework to Integrate Spatial Computing Ability and Data Aggregation for Emergency Management of Public Health. <i>GeoInformatica</i>, 22(2), 383-410.</li>
-
-</ol>
-
-<strong>2017</strong><br/>
-<ol>
-
-<li class="paper">Li, G., Yang, X., Xu, W., <b>Zhu, Y.</b> (2017). Social Embeddedness and Customer-Generated Content: The Moderation Effect of Employee Participation. <i>Journal of Electronic Commerce Research</i>, 18(3), 245.</li>
-
-<li class="paper">杨微石, 郭旦怀, 逯燕玲, 王德强, <b>朱映秋</b>, 张宝秀 (2017). 基于大数据的文化遗产认知分析方法——以北京旧城中轴线为例. <i>地理科学进展</i>, 9, 1111-1118.</li>
-
-</ol>
-
-
-<strong>2016</strong><br/>
-<ol>
-
-<li class="paper">Guo, D., <b>Zhu, Y.</b>, Xu, W., Shang, S., Ding, Z. (2016). How to Find Appropriate Automobile Exhibition Halls: Towards a Personalized Recommendation Service for Auto Show. <i>Neurocomputing</i>, 213, 95-101.</li>
-
-<li class="paper">Guo, D., Zhou, Y., <b>Zhu, Y.</b>, Li, J. (2016). Species Distribution Modeling via Spatial Bagging of Multiple Conditional Random Fields. In International Conference on Database Systems for Advanced Applications (DASFAA) (pp. 437-450).</li>
-
-
-<li class="paper">Li, G., Yang, X., Xu, W., <b>Zhu, Y.</b> (2016). Customer-generated content in company social media platform: How social network works? In 2016 IEEE International Conference on Management of Innovation and Technology (ICMIT) (pp. 188-192).</li>
-
-</ol>
-
-<strong>2015</strong><br/>
-<ol>
-
-<li class="paper">Zhang, D., Xu, W., <b>Zhu, Y.</b>, Zhang, X. (2015). Can sentiment analysis help mimic decision-making process of loan granting? A novel credit risk evaluation approach using GMKL model. In 2015 48th Hawaii International Conference on System Sciences (HICSS) (pp.949-958)</li>
-
-</ol>
-
-
+                <strong>2026</strong><br/>
+                <ol>
+                    <li class="paper"><b>Zhu, Y.</b>, Huang, D. (2026). A Communication Efficient Boosting Method for Distributed Spectral Clustering. <i>Pattern Recognition</i>, 176, 113168.</li>
+                    <li class="paper"><b>Zhu, Y.</b>, Bao, Y., Qin, L., Sun, Q., Shia, B., Chen, M. (2026). Resilience Analysis based on Multi-Layer Network Community Detection of Supply Chain Network. <i>Annals of Operations Research</i>, 361, 1447–1471. </li>
+                    <li class="paper">Qin, L., Zhang, X., <b>Zhu, Y.*</b>, Chen, Y., Shia, B. (2026). Bilateral Matrix Spatiotemporal Autoregressive Model. <i>Computational Statistics & Data Analysis</i>, 215, 108291.</li>
+                    <li class="paper">Qin, L., Wang, Y., <b>Zhu, Y.</b>, Shia, B. (2026). A Universal Kriging Predictor for Probability Density Function based on Gaussian Mixture Model. <i>Journal of Forecasting</i>, 45(3), 1188-1202.</li>
+                    <li class="paper">秦磊, 陈阳, <b>朱映秋*</b>, 谢邦昌 (2026). 矩阵值时间序列的时空自回归模型及其应用. <i>统计研究</i>, 2026, 43(04): 146-160.</li>
+                    <li class="paper"><b>Zhu, Y.</b>, Li, J., Qin, L., Yang, J., Chen, M. (2026). SGCN: A Robust Subsampling-Based GCN for Large-Scale Network with Out-of-Distribution Nodes. <i>Annals of Operations Research</i>. https://doi.org/10.1007/s10479-026-07269-9</li>
+                    <li class="paper">Wang, Y., <b>Zhu, Y.</b>, Shia, B., Chen, M., Qin, L. (2026). Density Prediction of Income Distribution based on Mixed Frequency Data. <i>Applied Economics</i>. https://doi.org/10.1080/00036846.2026.2649920</li>
+                </ol>
+
+                <strong>2025</strong><br/>
+                <ol>
+                    <li class="paper"><b>Zhu, Y.</b>, Huang, D., Zhang, B. (2025). A Wasserstein Distance-Based Spectral Clustering Method for Transaction Data Analysis. <i>Expert Systems With Applications</i>, 260, 125418.</li>
+                    <li class="paper">Qin, L., Wang, Y.*, <b>Zhu, Y.*</b>, Shia, B. (2025). Bayesian Dynamic Matrix Factor Models. <i>Journal of Business & Economic Statistics</i>, 43(4), 1170–1182. </li>
+                    <li class="paper"><b>Zhu, Y.</b>, Wang, Y., Qin, L., Zhang, B., Shia, B., Chen, M. (2025). Naïve Bayes Classifier based on Reliability Measurement for Datasets with Noisy Labels. <i>Annals of Operations Research</i>, 349, 259-286.</li>
+                    <li class="paper">Qin, L., <b>Zhu, Y.*</b>, Liu, S., Zhang, X., Zhao, Y. (2025). The Shapley Value in Data Science: Advances in Computation, Extensions, and Applications. <i>Mathematics</i>, 13(10), 1581.</li>
+                    <li class="paper">Xu, K., <b>Zhu, Y.*</b>, Liu, Y., Wang, H. (2025). CluBear: A Subsampling Package for Interactive Statistical Analysis with Massive Data on a Single Machine. <i>Communications in Statistics-Simulation and Computation</i>. 54(6), 1966–1986.</li>
+                    <li class="paper">Xiao, Y., <b>Zhu, Y.*</b>, Huang, D. (2025). Adaptive Subsampling Spectral Clustering based on Second-Order Neighbour Relationships for Sparse Networks. <i>Stat</i>, 14(4), e70098.</li>
+                    <li class="paper">Wang, W., Qin, L., Wang, Y., Ye, L., Wang, R., <b>Zhu, Y.*</b> (2025). Frequent Use of Online Medical Records: Analysis of Influence Factors based on Structural Equation Modeling. <i>Frontiers in Public Health</i>, 13, 1609503.</li>
+                    <li class="paper">Yin, H., Wang, L., <b>Zhu, Y.</b>, Zhu, L., & Huang, D. (2025). Vertical Federated Feature Screening. In The Thirty-ninth Annual Conference on Neural Information Processing Systems (NeurIPS). </li>
+                    <li class="paper"><b>朱映秋</b>, 郑畅, 张波 (2025). 金融时间序列的自适应贝叶斯在线变点检测. <i>统计研究</i>, 42(01), 145-160.</li>
+                    <li class="paper">秦磊, 王寅智, <b>朱映秋</b>, 谢邦昌 (2025). 已知组结构下混频时间序列的潜在因子分析. <i>系统工程理论与实践,</i> 45(3): 1014-1028.</li>
+                </ol>
+
+                <strong>2024</strong><br/>
+                <ol>
+                    <li class="paper"><b>Zhu, Y.</b>, Wang, R., Feng, M., Qin, L., Shia, B., Chen, M. (2024). Supply Chain Analysis based on Community Detection of Multi-Layer Weighted Networks. <i>Mathematics</i>, 12(22), 3606.</li>
+                    <li class="paper">Zeng, Q., <b>Zhu, Y.*</b>, Zhu, X., Wang, F., Zhao, W., Sun, S., Su, M., Wang, H. (2024). Improved Naive Bayes with Mislabeled Data. <i>Statistics and Its Interface</i>, 17(3), 323-336.</li>
+                    <li class="paper">Wang, Y., <b>Zhu, Y.</b>, Sun, Q., Qin, L. (2024). Adaptively Robust High-Dimensional Matrix Factor Analysis under Huber Loss Function. <i>Journal of Statistical Planning and Inference</i>. 231, 106137.</li>
+                    <li class="paper">Deng, J., Huang, D., Ding, Y., <b>Zhu, Y.</b>, Jing, B., Zhang, B. (2024). Subsampling Spectral Clustering for Stochastic Block Models in Large-Scale Networks. <i>Computational Statistics & Data Analysis</i>, 189, 107835.</li>
+                    <li class="paper"><b>朱映秋</b>, 黄丹阳, 张波 (2024). 基于高斯混合模型的分布因子聚类方法. <i>统计研究</i>, 41(06), 147-160.</li>
+                    <li class="paper">陈阳, 张晓梅, <b>朱映秋</b>, 秦磊 (2024). 矩阵值时间序列自回归模型的稳健估计. <i>应用数学学报</i>, 47(6): 999-1026.</li>
+                </ol>
+
+                <strong>2023</strong><br/>
+                <ol>
+                    <li class="paper">Pan, R., <b>Zhu, Y.*</b>, Guo, B., Zhu, X., Wang, H. (2023). A Sequential Addressing Subsampling Method for Massive Data Analysis under Memory Constraint. <i>IEEE Transactions on Knowledge and Data Engineering</i>, 35(9), 9502-9513.</li>
+                    <li class="paper">黄丹阳, 罗伊琳, <b>朱映秋*</b> (2023). 面向第三方支付平台非结构化大数据分布特征的融合聚类算法. <i>经济管理学刊</i>, 2(3), 179-208.</li>
+                    <li class="paper">黄丹阳,<b>朱映秋</b>,南金伶,王汉生 (2023).基于交易流水的信用卡套现交易及商户识别. <i>数理统计与管理</i>, 42(01), 127-144.</li>
+                </ol>
+
+                <strong>2021</strong><br/>
+                <ol>
+                    <li class="paper"><b>Zhu, Y.</b>, Deng, Q., Huang, D., Jing, B., Zhang, B. (2021). Clustering Based on Kolmogorov–Smirnov Statistic with Application to Bank Card Transaction Data. <i>Journal of the Royal Statistical Society: Series C (Applied Statistics)</i>, 70(3), 558-578.</li>
+                    <li class="paper"><b>Zhu, Y.</b>, Huang, D., Gao, Y., Wu, R., Chen, Y., Zhang, B., Wang, H. (2021). Automatic, Dynamic, and Nearly Optimal Learning Rate Specification via Local Quadratic Approximation. <i>Neural Networks</i>, 141, 11-29.</li>
+                    <li class="paper">Wang, F., <b>Zhu, Y.</b>, Huang, D., Qi, H., Wang, H. (2021). Distributed One-Step Upgraded Estimation for Non-Uniformly and Nonrandomly Distributed Data. <i>Computational Statistics & Data Analysis</i>, 162, 107265.</li>
+                    <li class="paper"><b>朱映秋</b>, 张波 (2021). 基于已实现波动率的上证综指异常时序检测. <i>系统工程理论与实践</i>, 41(3), 625-635.</li>
+                    <li class="paper">黄丹阳, 毕博洋, <b>朱映秋</b> (2021). 基于高斯谱聚类的风险商户聚类分析. <i>统计研究</i>, 38(6), 145-160.</li>
+                </ol>
+
+                <strong>2020</strong><br/>
+                <ol>
+                    <li class="paper"><b>Zhu, Y.</b>, Huang, D., Xu, W., Zhang, B. (2020). Link Prediction Combining Network Structure and Topic Distribution in Large-Scale Directed Network. <i>Journal of Organizational Computing and Electronic Commerce</i>, 30(2), 169-185.</li>
+                </ol>
+
+                <strong>2018</strong><br/>
+                <ol>
+                    <li class="paper">Guo, D., <b>Zhu, Y.</b>, Yin, W. (2018). OSCAR: A Framework to Integrate Spatial Computing Ability and Data Aggregation for Emergency Management of Public Health. <i>GeoInformatica</i>, 22(2), 383-410.</li>
+                </ol>
+
+                <strong>2017</strong><br/>
+                <ol>
+                    <li class="paper">Li, G., Yang, X., Xu, W., <b>Zhu, Y.</b> (2017). Social Embeddedness and Customer-Generated Content: The Moderation Effect of Employee Participation. <i>Journal of Electronic Commerce Research</i>, 18(3), 245.</li>
+                    <li class="paper">杨微石, 郭旦怀, 逯燕玲, 王德强, <b>朱映秋</b>, 张宝秀 (2017). 基于大数据的文化遗产认知分析方法——以北京旧城中轴线为例. <i>地理科学进展</i>, 9, 1111-1118.</li>
+                </ol>
+
+                <strong>2016</strong><br/>
+                <ol>
+                    <li class="paper">Guo, D., <b>Zhu, Y.</b>, Xu, W., Shang, S., Ding, Z. (2016). How to Find Appropriate Automobile Exhibition Halls: Towards a Personalized Recommendation Service for Auto Show. <i>Neurocomputing</i>, 213, 95-101.</li>
+                    <li class="paper">Guo, D., Zhou, Y., <b>Zhu, Y.</b>, Li, J. (2016). Species Distribution Modeling via Spatial Bagging of Multiple Conditional Random Fields. In International Conference on Database Systems for Advanced Applications (DASFAA) (pp. 437-450).</li>
+                    <li class="paper">Li, G., Yang, X., Xu, W., <b>Zhu, Y.</b> (2016). Customer-generated content in company social media platform: How social network works? In 2016 IEEE International Conference on Management of Innovation and Technology (ICMIT) (pp. 188-192).</li>
+                </ol>
+
+                <strong>2015</strong><br/>
+                <ol>
+                    <li class="paper">Zhang, D., Xu, W., <b>Zhu, Y.</b>, Zhang, X. (2015). Can sentiment analysis help mimic decision-making process of loan granting? A novel credit risk evaluation approach using GMKL model. In 2015 48th Hawaii International Conference on System Sciences (HICSS) (pp.949-958)</li>
+                </ol>
 
             </div>
 
-            
         </div>
-
 
     </div>
     <!-- /.container -->
-    
+
     <!-- Other people may like it too! -->
-    <a style="color:#b5bec9;font-size:0.8em; float:right;" href="https://github.com/mavroudisv/plain-academic">Plain Academic</a> 
-<!-- Canvas 背景 -->
+    <a style="color:#b5bec9;font-size:0.8em; float:right;" href="https://github.com/mavroudisv/plain-academic">Plain Academic</a>
+
+    <!-- Canvas 背景 -->
     <canvas id="poly-canvas"></canvas>
 
-   
-
     <script>
-/* ========== 黑白多边形背景 ========== */
-const canvas = document.getElementById('poly-canvas');
-const ctx    = canvas.getContext('2d');
+        /* ========== 黑白多边形背景 ========== */
+        const canvas = document.getElementById('poly-canvas');
+        const ctx = canvas.getContext('2d');
 
-function resize() {
-    canvas.width  = window.innerWidth;
-    canvas.height = document.documentElement.scrollHeight; // 整个可滚动高度
-}
-window.addEventListener('resize', resize);
-resize();
-
-class Poly {
-    constructor() {
-        this.x = Math.random() * canvas.width;
-        this.y = Math.random() * canvas.height;
-        this.size = Math.random() * 70 + 20;
-        this.rot  = 0;
-        this.rotSp= (Math.random() - .5) * 0.02;
-        this.vx   = (Math.random() - .5) * 0.4;
-        this.vy   = (Math.random() - .5) * 0.4;
-        this.sides= Math.floor(Math.random() * 4) + 3;
-        this.opacity = Math.random() * 0.2 + 0.1;
-    }
-    update() {
-        this.x += this.vx;
-        this.y += this.vy;
-        this.rot += this.rotSp;
-        // 水平边界循环
-        if (this.x < -this.size) this.x = canvas.width  + this.size;
-        if (this.x > canvas.width  + this.size) this.x = -this.size;
-        // 垂直边界循环（支持长页面）
-        if (this.y < -this.size) this.y = canvas.height + this.size;
-        if (this.y > canvas.height + this.size) this.y = -this.size;
-    }
-    draw() {
-        ctx.save();
-        ctx.translate(this.x, this.y);
-        ctx.rotate(this.rot);
-        ctx.strokeStyle = `rgba(0,0,0,${this.opacity})`;
-        ctx.lineWidth = 1.5;
-        ctx.beginPath();
-        for (let i = 0; i < this.sides; i++) {
-            const a = (i / this.sides) * Math.PI * 2;
-            const x = Math.cos(a) * this.size;
-            const y = Math.sin(a) * this.size;
-            i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+        function resize() {
+            canvas.width = window.innerWidth;
+            canvas.height = document.documentElement.scrollHeight;
         }
-        ctx.closePath(); ctx.stroke();
-        ctx.restore();
-    }
-}
+        window.addEventListener('resize', resize);
+        resize();
 
-const polys = Array.from({length: 77}, () => new Poly());
+        class Poly {
+            constructor() {
+                this.x = Math.random() * canvas.width;
+                this.y = Math.random() * canvas.height;
+                this.size = Math.random() * 70 + 20;
+                this.rot = 0;
+                this.rotSp = (Math.random() - .5) * 0.02;
+                this.vx = (Math.random() - .5) * 0.4;
+                this.vy = (Math.random() - .5) * 0.4;
+                this.sides = Math.floor(Math.random() * 4) + 3;
+                this.opacity = Math.random() * 0.2 + 0.1;
+            }
+            update() {
+                this.x += this.vx;
+                this.y += this.vy;
+                this.rot += this.rotSp;
+                if (this.x < -this.size) this.x = canvas.width + this.size;
+                if (this.x > canvas.width + this.size) this.x = -this.size;
+                if (this.y < -this.size) this.y = canvas.height + this.size;
+                if (this.y > canvas.height + this.size) this.y = -this.size;
+            }
+            draw() {
+                ctx.save();
+                ctx.translate(this.x, this.y);
+                ctx.rotate(this.rot);
+                ctx.strokeStyle = `rgba(0,0,0,${this.opacity})`;
+                ctx.lineWidth = 1.5;
+                ctx.beginPath();
+                for (let i = 0; i < this.sides; i++) {
+                    const a = (i / this.sides) * Math.PI * 2;
+                    const x = Math.cos(a) * this.size;
+                    const y = Math.sin(a) * this.size;
+                    i === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y);
+                }
+                ctx.closePath();
+                ctx.stroke();
+                ctx.restore();
+            }
+        }
 
-function loop() {
-    ctx.clearRect(0, 0, canvas.width, canvas.height);
-    polys.forEach(p => { p.update(); p.draw(); });
-    requestAnimationFrame(loop);
-}
-loop();
+        const polys = Array.from({ length: 77 }, () => new Poly());
 
-/* 鼠标轻微影响 */
-let mx = canvas.width / 2, my = canvas.height / 2;
-addEventListener('mousemove', e => { mx = e.clientX; my = e.clientY + window.scrollY; });
-</script>
+        function loop() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            polys.forEach(p => { p.update();
+                p.draw(); });
+            requestAnimationFrame(loop);
+        }
+        loop();
+
+        let mx = canvas.width / 2,
+            my = canvas.height / 2;
+        addEventListener('mousemove', e => { mx = e.clientX;
+            my = e.clientY + window.scrollY; });
+
+        /* ============================================================
+               ★★★ 图片异步懒加载（AJAX 风格） ★★★
+               ============================================================ */
+
+        document.addEventListener('DOMContentLoaded', function() {
+
+            const lazyImages = document.querySelectorAll('img.lazy-image');
+
+            if (lazyImages.length === 0) return;
+
+            function loadImage(img) {
+                const src = img.getAttribute('data-src');
+                if (!src) return;
+                if (img.dataset.loaded === 'true') return;
+                img.dataset.loaded = 'true';
+
+                const wrapper = img.closest('.lazy-image-wrapper');
+                const placeholder = wrapper ? wrapper.querySelector('.placeholder') : null;
+
+                const imageLoader = new Image();
+
+                imageLoader.onload = function() {
+                    img.src = src;
+                    img.classList.add('loaded');
+                    if (placeholder) {
+                        placeholder.classList.add('hidden');
+                    }
+                    img.removeAttribute('data-src');
+                };
+
+                imageLoader.onerror = function() {
+                    if (placeholder) {
+                        placeholder.innerHTML = '<span style="color:#c0392b;">⚠️ 图片加载失败</span>';
+                        placeholder.classList.remove('hidden');
+                    }
+                    img.classList.add('error');
+                    console.warn('图片加载失败:', src);
+                };
+
+                imageLoader.src = src;
+            }
+
+            if ('IntersectionObserver' in window) {
+                const observer = new IntersectionObserver((entries, obs) => {
+                    entries.forEach(entry => {
+                        if (entry.isIntersecting) {
+                            const img = entry.target;
+                            loadImage(img);
+                            obs.unobserve(img);
+                        }
+                    });
+                }, {
+                    rootMargin: '200px 0px',
+                    threshold: 0.01
+                });
+
+                lazyImages.forEach(img => observer.observe(img));
+            } else {
+                lazyImages.forEach(img => loadImage(img));
+            }
+
+            // 滚动兜底
+            let scrollCheckTimer = null;
+            window.addEventListener('scroll', function() {
+                if (scrollCheckTimer) return;
+                scrollCheckTimer = setTimeout(() => {
+                    lazyImages.forEach(img => {
+                        if (img.dataset.loaded === 'true') return;
+                        const rect = img.getBoundingClientRect();
+                        const winHeight = window.innerHeight;
+                        if (rect.top < winHeight + 200 && rect.bottom > -200) {
+                            loadImage(img);
+                        }
+                    });
+                    scrollCheckTimer = null;
+                }, 300);
+            });
+
+            window.addEventListener('load', function() {
+                lazyImages.forEach(img => {
+                    if (img.dataset.loaded === 'true') return;
+                    const rect = img.getBoundingClientRect();
+                    const winHeight = window.innerHeight;
+                    if (rect.top < winHeight + 200 && rect.bottom > -200) {
+                        loadImage(img);
+                    }
+                });
+            });
+
+            window.refreshLazyImages = function() {
+                lazyImages.forEach(img => {
+                    if (img.dataset.loaded === 'true') return;
+                    const rect = img.getBoundingClientRect();
+                    const winHeight = window.innerHeight;
+                    if (rect.top < winHeight + 200 && rect.bottom > -200) {
+                        loadImage(img);
+                    }
+                });
+            };
+
+        });
+    </script>
+
 </body>
-
 </html>
