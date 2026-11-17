@@ -164,7 +164,7 @@ a:hover {
 }
 .layout-grid {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) 370px;
+    grid-template-columns: minmax(0, 1fr) 355px;
     gap: 34px;
     align-items: start;
 }
@@ -221,31 +221,6 @@ a:hover {
     opacity: 0.7;
 }
 
-/* ---------- 首页：主照片 ---------- */
-.hero-photo {
-    padding: 12px;
-    margin-bottom: 30px;
-}
-.hero-photo .photo-frame {
-    overflow: hidden;
-    border-radius: 2px;
-    border: 1px solid var(--gold-line);
-}
-.hero-photo img {
-    display: block;
-    width: 100%;
-    height: auto;
-}
-.hero-photo .caption {
-    font-family: var(--serif);
-    font-style: italic;
-    color: var(--ink-soft);
-    font-size: 13px;
-    text-align: center;
-    padding: 12px 6px 4px;
-    letter-spacing: 0.5px;
-}
-
 /* ---------- 首页：DiCA 介绍卡 ---------- */
 .dica-card {
     margin-bottom: 34px;
@@ -275,10 +250,10 @@ a:hover {
 }
 .dica-body {
     display: grid;
-    grid-template-columns: 1fr 210px;
+    grid-template-columns: 1fr;
     gap: 18px;
     padding: 20px 22px 22px;
-    align-items: center;
+    align-items: start;
 }
 .dica-body h3 {
     font-family: var(--serif);
@@ -305,8 +280,19 @@ a:hover {
     border-radius: 20px;
     padding: 3px 11px;
 }
+.dica-side {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 14px;
+}
+.dica-side .dica-figure {
+    width: 100%;
+    border-color: var(--gold-line);
+}
 .dica-btn {
     display: inline-block;
+    align-self: flex-end;
     font-size: 13px;
     letter-spacing: 1px;
     color: #fff !important;
@@ -317,6 +303,7 @@ a:hover {
     border-radius: 2px;
     box-shadow: var(--shadow-sm);
     transition: transform 0.2s ease, box-shadow 0.2s ease;
+    white-space: nowrap;
 }
 .dica-btn:hover {
     transform: translateY(-2px);
@@ -448,6 +435,7 @@ a:hover {
     margin-top: 5px;
     font-size: 11.5px;
     color: var(--ink-soft);
+    white-space: nowrap;
 }
 .divider {
     height: 1px;
@@ -529,6 +517,7 @@ a:hover {
 .edu-item .edu-zh {
     display: block;
     color: var(--ink);
+    white-space: nowrap;
 }
 .edu-item .edu-en {
     display: block;
