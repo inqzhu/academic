@@ -102,10 +102,9 @@ a:hover {
 }
 .site-brand {
     font-family: var(--serif);
-    font-size: 20px;
+    font-size: 22px;
     letter-spacing: 2px;
     color: var(--paper);
-    text-transform: uppercase;
     white-space: nowrap;
 }
 .site-brand .crest {
@@ -128,6 +127,14 @@ a:hover {
     letter-spacing: 1px;
     border-bottom: 2px solid transparent;
     transition: all 0.2s ease;
+    white-space: nowrap;
+}
+/* 导航里的英文：字号略小、颜色略淡，中文为主 */
+.site-nav ul li a .en {
+    font-size: 11.5px;
+    letter-spacing: 0.5px;
+    opacity: 0.62;
+    text-transform: none;
 }
 .site-nav ul li a:hover {
     color: #fff;
@@ -157,7 +164,7 @@ a:hover {
 }
 .layout-grid {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) 320px;
+    grid-template-columns: minmax(0, 1fr) 370px;
     gap: 34px;
     align-items: start;
 }
@@ -207,6 +214,11 @@ a:hover {
 .section-title .mark {
     color: var(--gold);
     font-size: 15px;
+}
+.section-title .en {
+    font-size: 18px;
+    letter-spacing: 0.5px;
+    opacity: 0.7;
 }
 
 /* ---------- 首页：主照片 ---------- */
@@ -372,12 +384,20 @@ a:hover {
 .pubs li.paper i {
     color: var(--ink);
 }
-/* 论文补充标注：藏蓝色，区别于黑色引用 */
+/* 论文补充标注：淡藏蓝底的小标签，低调但醒目 */
 .pub-badge {
+    display: inline-block;
     color: var(--navy);
-    font-size: 12.5px;
-    font-weight: 600;
+    background: rgba(31, 58, 95, 0.07);
+    border: 1px solid rgba(31, 58, 95, 0.2);
+    border-radius: 3px;
+    padding: 1px 7px;
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.2px;
     white-space: nowrap;
+    line-height: 1.5;
+    vertical-align: baseline;
 }
 .pub-badge .sep {
     color: var(--gold);
@@ -419,9 +439,15 @@ a:hover {
 }
 .profile-title {
     font-size: 13px;
-    color: var(--ink-soft);
+    color: var(--ink);
     line-height: 1.6;
     margin: 0 0 18px;
+}
+.profile-title .en-line {
+    display: inline-block;
+    margin-top: 5px;
+    font-size: 11.5px;
+    color: var(--ink-soft);
 }
 .divider {
     height: 1px;
@@ -469,6 +495,11 @@ a:hover {
     font-size: 11px;
     top: 5px;
 }
+.side-links li .en {
+    font-size: 11px;
+    color: var(--ink-soft);
+    opacity: 0.85;
+}
 .side-block .edu-item {
     padding: 5px 0 5px 16px;
     position: relative;
@@ -480,6 +511,31 @@ a:hover {
     position: absolute;
     left: 0;
     color: var(--gold);
+}
+/* 中英双语：中文为主，英文为辅 */
+.side-block .bio-zh {
+    margin: 0 0 9px;
+    color: var(--ink);
+    text-align: justify;
+}
+.side-block .bio-en {
+    margin: 0;
+    font-size: 11.8px;
+    line-height: 1.6;
+    color: var(--ink-soft);
+    font-style: italic;
+    text-align: justify;
+}
+.edu-item .edu-zh {
+    display: block;
+    color: var(--ink);
+}
+.edu-item .edu-en {
+    display: block;
+    font-size: 11.5px;
+    color: var(--ink-soft);
+    font-style: italic;
+    margin-top: 1px;
 }
 
 /* ---------- 懒加载 ---------- */
@@ -516,12 +572,16 @@ a:hover {
     letter-spacing: 3px;
     margin: 0 0 8px;
 }
+.gallery-intro h1 .en {
+    font-size: 20px;
+    letter-spacing: 1px;
+    opacity: 0.7;
+}
 .gallery-intro .sub {
     font-family: var(--serif);
-    font-style: italic;
     color: var(--gold);
     letter-spacing: 1px;
-    font-size: 14px;
+    font-size: 13.5px;
 }
 .gallery-intro .rule {
     width: 120px;
